@@ -1,0 +1,345 @@
+name: Build DPO Office APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Create Android project
+        run: |
+          mkdir -p android/app/src/main/java/com/dpooffice/exam
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+          cd android
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "DPOOffice"
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins { id 'com.android.application' version '8.5.2' apply false }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.dpooffice.exam'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.dpooffice.exam'
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              buildTypes { release { minifyEnabled false } }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:label="DPO Office"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
+                  android:theme="@style/AppTheme"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.Light.DarkActionBar">
+                  <item name="android:colorPrimary">#0D5466</item>
+                  <item name="android:colorPrimaryDark">#0A3F4D</item>
+                  <item name="android:colorAccent">#0D5466</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_bg.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="#0D5466" />
+          </shape>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_fg.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#FFFFFF"
+                  android:pathData="M40,32h28a4,4 0,0 1,4 4v36a4,4 0,0 1,-4 4h-28a4,4 0,0 1,-4 -4v-36a4,4 0,0 1,4 -4z" />
+              <path android:fillColor="#0D5466"
+                  android:pathData="M46,28h16v8h-16z" />
+              <path android:strokeColor="#0D5466" android:strokeWidth="4"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"
+                  android:fillColor="#00000000"
+                  android:pathData="M44,56l7,7l13,-15" />
+          </vector>
+          EOF
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_bg" />
+              <foreground android:drawable="@drawable/ic_fg" />
+          </adaptive-icon>
+          EOF
+
+          cat > app/src/main/java/com/dpooffice/exam/MainActivity.java <<'EOF'
+          package com.dpooffice.exam;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.text.InputType;
+          import android.view.Gravity;
+          import android.view.Menu;
+          import android.view.MenuItem;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.webkit.CookieManager;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceError;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ProgressBar;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          public class MainActivity extends Activity {
+              private static final String PREF_URL = "url";
+              private SharedPreferences prefs;
+              private WebView web;
+              private ProgressBar bar;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  prefs = getSharedPreferences("dpo", MODE_PRIVATE);
+                  String url = prefs.getString(PREF_URL, null);
+                  if (url == null) showSetup(null); else showWeb(url);
+              }
+
+              private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
+              private void showSetup(String error) {
+                  web = null;
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setPadding(dp(24), dp(32), dp(24), dp(24));
+
+                  TextView title = new TextView(this);
+                  title.setText("Connect DPO Office");
+                  title.setTextSize(24);
+                  title.setTypeface(Typeface.SERIF, Typeface.BOLD);
+                  title.setTextColor(Color.parseColor("#16212B"));
+                  box.addView(title);
+
+                  TextView help = new TextView(this);
+                  help.setText("Paste your web app link. You can find it in the Google Sheet menu: DPO Office → Show app links. It ends in /exec.");
+                  help.setTextSize(15);
+                  help.setTextColor(Color.parseColor("#5A6773"));
+                  help.setPadding(0, dp(12), 0, dp(16));
+                  box.addView(help);
+
+                  final EditText input = new EditText(this);
+                  input.setHint("https://script.google.com/macros/s/…/exec");
+                  input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+                  input.setSingleLine(true);
+                  String saved = prefs.getString(PREF_URL, "");
+                  input.setText(saved);
+                  box.addView(input);
+
+                  if (error != null) {
+                      TextView err = new TextView(this);
+                      err.setText(error);
+                      err.setTextColor(Color.parseColor("#B0302A"));
+                      err.setPadding(0, dp(8), 0, 0);
+                      box.addView(err);
+                  }
+
+                  Button save = new Button(this);
+                  save.setText("Save and open");
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                  lp.topMargin = dp(16);
+                  save.setLayoutParams(lp);
+                  save.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          String base = normalize(input.getText().toString());
+                          if (base == null) {
+                              showSetup("That link doesn't look right. It should start with https://script.google.com/ and end in /exec.");
+                              return;
+                          }
+                          prefs.edit().putString(PREF_URL, base).apply();
+                          showWeb(base);
+                      }
+                  });
+                  box.addView(save);
+
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setBackgroundColor(Color.parseColor("#F3F5F7"));
+                  scroll.addView(box);
+                  setContentView(scroll);
+              }
+
+              private String normalize(String raw) {
+                  String v = raw == null ? "" : raw.trim();
+                  if (!v.startsWith("https://script.google.com/")) return null;
+                  int i = v.indexOf("/exec");
+                  if (i < 0) return null;
+                  return v.substring(0, i + 5);
+              }
+
+              private void showWeb(String base) {
+                  FrameLayout frame = new FrameLayout(this);
+                  web = new WebView(this);
+                  frame.addView(web, new FrameLayout.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                  bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+                  bar.setMax(100);
+                  frame.addView(bar, new FrameLayout.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT, dp(4), Gravity.TOP));
+                  setContentView(frame);
+
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
+                  s.setSupportMultipleWindows(false);
+                  s.setJavaScriptCanOpenWindowsAutomatically(false);
+                  CookieManager cm = CookieManager.getInstance();
+                  cm.setAcceptCookie(true);
+                  cm.setAcceptThirdPartyCookies(web, true);
+
+                  web.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onProgressChanged(WebView view, int progress) {
+                          bar.setProgress(progress);
+                          bar.setVisibility(progress >= 100 ? View.GONE : View.VISIBLE);
+                      }
+                  });
+                  web.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                          Uri u = req.getUrl();
+                          String scheme = u.getScheme() == null ? "" : u.getScheme();
+                          String host = u.getHost() == null ? "" : u.getHost();
+                          boolean inside = (scheme.equals("https") || scheme.equals("http"))
+                                  && (host.endsWith("google.com") || host.endsWith("googleusercontent.com")
+                                      || host.endsWith("gstatic.com") || host.endsWith("googleapis.com"));
+                          if (inside) return false;
+                          try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { /* no app for link */ }
+                          return true;
+                      }
+
+                      @Override
+                      public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
+                          if (req.isForMainFrame()) {
+                              Toast.makeText(MainActivity.this,
+                                      "Could not reach DPO Office. Check your connection, then tap Reload.",
+                                      Toast.LENGTH_LONG).show();
+                          }
+                      }
+                  });
+                  web.loadUrl(base + "?admin");
+              }
+
+              @Override
+              public boolean onCreateOptionsMenu(Menu menu) {
+                  menu.add(0, 1, 0, "Reload");
+                  menu.add(0, 2, 1, "Change app link");
+                  return true;
+              }
+
+              @Override
+              public boolean onOptionsItemSelected(MenuItem item) {
+                  if (item.getItemId() == 1) {
+                      if (web != null) web.reload();
+                      else { String u = prefs.getString(PREF_URL, null); if (u != null) showWeb(u); }
+                      return true;
+                  }
+                  if (item.getItemId() == 2) { showSetup(null); return true; }
+                  return super.onOptionsItemSelected(item);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (web != null && web.canGoBack()) web.goBack();
+                  else super.onBackPressed();
+              }
+          }
+          EOF
+
+      - name: Build APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DPO-Office.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DPO-Office-APK
+          path: DPO-Office.apk
